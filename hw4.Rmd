@@ -1,0 +1,134 @@
+---
+title: "Homework 4"
+author: "Bernard Fay; GitHub: bj99fay"
+date: "3/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(datasets)
+```
+
+## Chick weights
+
+1. Get a frequency breakdown of the number of chicks, their average weight and the standard deviation of the weights in each of the diets at the start of the study. Store the resulting data frame in a variable named `weight0` and print.<br>
+<!-- 5 pts of extra credit: construct a ggplot that shows average weights by diet with an interval (shown as a line) of +- the standard deviation around the averages. -->
+
+```{r}
+dat1 <- ChickWeight %>%
+  filter(Time == 0) %>%
+  group_by(Diet) %>%
+  tally() %>%
+  rename(freq = n)
+
+dat2 <- ChickWeight %>%
+ filter(Time == 0) %>%
+ group_by(Diet) %>%
+ summarize(avg_weight = mean(weight, na.rm = TRUE),
+ sd_weight = sd(weight, na.rm = TRUE))
+
+weight0 <- merge(dat1, dat2, by="Diet")
+print(weight0)
+
+ggplot(weight0, aes(x=Diet, y=avg_weight)) +
+  geom_point(size=4) +
+  geom_errorbar(aes(ymin=avg_weight-sd_weight, ymax=avg_weight+sd_weight), width=.1,
+                 position=position_dodge(0.05)) +
+  ylab("Average Weight")
+```
+
+2. Each chick should have twelve weight measurements. Use the `dplyr` package to identify how many measurements are there for each chick. Extract a subset of the data for all chicks with complete information, name the data set `complete`, and print the first 3 rows. (Hint: you might want to use mutate to introduce a helper variable consisting of the number of observations)
+
+```{r}
+dat3 <- ChickWeight %>%
+        add_count(Chick) %>%
+        rename(count = n)
+
+complete <- dat3 %>%
+            filter(count == 12)
+
+complete %>% head(3)
+```
+
+3. In the complete data set introduce a new variable that measures the current weight difference compared to day 0. Name this variable  `weightgain` and print the first 3 rows of the new data frame.
+
+```{r}
+complete <- complete %>%
+            group_by(Chick) %>%
+            mutate(weightgain = weight - weight[1])
+
+complete %>% head(3)
+```
+
+4. Use `{ggplot2}` to create side-by-side boxplots of `weightgain` by `Diet` for day 21. Change the order of the categories in the Diet variable such that the boxplots are ordered by median `weightgain`, and the lower limit of the y axis should be 0. Describe the relationship in 2-3 sentences. 
+
+```{r}
+temp <- complete %>%
+        filter(Time == 21) %>%
+        group_by(Diet)
+
+ggplot(temp, aes(x=reorder(Diet, weightgain, median), y=weightgain)) + 
+  geom_boxplot() + 
+  ylim(0,350) + 
+  xlab("Diet") + 
+  ylab("Weight Gain")
+```
+
+No two diets had similar median weightgains. However, each diet had vary different degrees of variation and it isn't related to the average weight gain. This would indicate that there might be a third factor influencing weight gain.
+
+5. Answer each of the following questions using numerical and graphical summary. Also explain what you found: (a) Which chick gained the most weight and which gained the least weight? (b) What diets were they on?
+
+```{r}
+temp2 <- complete %>%
+          filter(Time == 21) %>%
+          select(Chick, Diet, weightgain) %>%
+          arrange(desc(weightgain))
+
+ggplot(temp2, aes(x=reorder(Chick, weightgain), y=weightgain, fill=Diet)) + geom_bar(stat="identity") + coord_flip()
+
+#print("Most weight gained")
+temp2 %>% head(1)
+#print("Least Weight gained")
+temp2 %>% tail(1)
+```
+
+The difference in weightgain is extremely large between th maximum and minimum. When we lok at the diet for these chicks, it suggests that the diet might indeed have affected the weight gain.
+
+6. For the chicks with the least and the most weight at time 0, plot their growth trajectories over time.
+
+```{r}
+temp3 <- complete %>% filter(Time==0) %>% subset(weight==min(weight, na.rm=TRUE)) %>% ungroup()
+temp4 <- complete %>% filter(Time==0) %>% subset(weight==max(weight, na.rm=TRUE)) %>% ungroup()
+temp5 <- rbind(temp3, temp4)
+temp6 <- complete %>% filter(Chick %in% temp5$Chick)
+temp6
+
+ggplot(data=temp6, aes(x=Time, y=weight, group=Chick)) + geom_line(aes(color=Chick)) + geom_point(aes(color=Chick))
+
+```
+
+7. Add to the previous plot the average growth trajectory for all chicks (calculated as the mean weight for each chick at each time). How do the trajectories compare?
+
+```{r}
+ggplot(data=temp6, aes(x=Time, y=weight, group=Chick)) + geom_line(aes(color=Chick)) + geom_point(aes(color=Chick)) + 
+  stat_summary(aes(y = weight,group=1), fun.y=mean, colour="red", geom="line",group=1)
+
+```
+
+The lighest weight chicks actually grew at the fastest rate, which is interesting.
+
+8. What else do you find interesting in the dataset? Show your exploratory analysis.
+
+What do the growth trajectories for the chicks based on diet look like, and what is the mean growth rate?
+
+```{r}
+temp7 <- complete %>% group_by(Diet)
+
+ggplot(data=temp7, aes(x=Time, y=weight, group=Chick)) + geom_line(aes(color=Diet)) + geom_point(aes(color=Diet)) + 
+  stat_summary(aes(y = weight,group=1), fun.y=mean, colour="black", geom="line",group=1)
+```
+
+Note: your submission is supposed to be fully reproducible, i.e. the TA and I will 'knit' your submission in RStudio. 
